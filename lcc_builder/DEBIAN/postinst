@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+# Servisleri başlat ve otomatik çalışmayı aç
+systemctl start apache2 || true
+systemctl enable apache2 || true
+systemctl start mariadb || true
+systemctl enable mariadb || true
+
+# Dizin izinlerini ayarla
+chmod 777 /var/www/env || true
+chmod 777 /var/www/html/backups || true
+chmod -R 777 /var/www/html || true
+chmod +x /usr/local/bin/fix-html-permissions.sh || true
+chmod +x /usr/share/applications/localhost-control-center.desktop || true
+
+# İkon Önbelleğini Yenile
+gtk-update-icon-cache -f -t /usr/share/icons/hicolor 2>/dev/null || true
+
+echo "======================================================================"
+echo "🎉 Localhost Control Center (LCC) Başarıyla Kuruldu!"
+echo "👨‍💻 Lead Developer: Mustafa Satılmış (@mustafao9)"
+echo "🌐 Paneli Açmak İçin: http://localhost"
+echo "======================================================================"
+
+exit 0

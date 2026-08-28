@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=Localhost Control Center
+GenericName=cPanel & Localhost Manager
+Comment=Developer cPanel for Localhost PHP Development by Mustafa Satılmış
+Exec=xdg-open http://localhost
+Icon=/usr/share/pixmaps/localhost-control-center.png
+Terminal=false
+Type=Application
+Categories=Network;Development;WebDevelopment;
+Keywords=localhost;cpanel;php;mysql;apache;control;internet;
+Developer=Mustafa Satılmış

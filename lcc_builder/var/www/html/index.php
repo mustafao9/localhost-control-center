@@ -1,11 +1,13 @@
 <?php
 /**
- * Localhost Control Center v12.0 - Core Router & Controller
+ * Localhost Control Center v1.0.1 - Core Router & Controller
  * Lead Developer: Mustafa Satılmış (@mustafao9)
  */
-require_once __DIR__ . '/config.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
-$bildirim = '';
+require_once __DIR__ . '/config.php';
 
 // AJAX İstemleri
 if (isset($_GET['ajax_oku']) && guvenliYolMu($_GET['ajax_oku'])) {
@@ -41,7 +43,19 @@ if (isset($_GET['ajax_composer_kur'])) {
 
 if (isset($_GET['islem']) && $_GET['islem'] === 'phpinfo') { phpinfo(); exit; }
 
-// POST İşlemleri
+// GET Temizlik İşlemleri (PRG Yönlendirmeli)
+if (isset($_GET['islem'])) {
+    if ($_GET['islem'] === 'opcache_temizle' && function_exists('opcache_reset')) {
+        opcache_reset();
+        $_SESSION['bildirim'] = '<div class="alert alert-basari">⚡ OPcache başarıyla sıfırlandı!</div>';
+    } elseif ($_GET['islem'] === 'session_temizle') {
+        $_SESSION['bildirim'] = '<div class="alert alert-basari">🧹 Session verileri temizlendi.</div>';
+    }
+    header('Location: index.php');
+    exit;
+}
+
+// POST İşlemleri (PRG Yönlendirmeli)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
     $islem = $_POST['islem_tipi'];
     $hedef = $_POST['hedef_dizin'] ?? DOC_ROOT;
@@ -55,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                     $index_content = "<?php\n/** Proje: " . htmlspecialchars($proje_adi) . " */\nif (file_exists(__DIR__ . '/vendor/autoload.php')) require_once __DIR__ . '/vendor/autoload.php';\n?>\n<h1>🚀 " . htmlspecialchars($proje_adi) . " Çalışıyor!</h1>";
                     @file_put_contents($yeni_yol . '/index.php', $index_content);
                     exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg($yeni_yol));
-                    $bildirim = '<div class="alert alert-basari">🚀 <strong>' . htmlspecialchars($proje_adi) . '</strong> projesi oluşturuldu.</div>';
+                    $_SESSION['bildirim'] = '<div class="alert alert-basari">🚀 <strong>' . htmlspecialchars($proje_adi) . '</strong> projesi başarıyla oluşturuldu.</div>';
                 }
             }
         } elseif ($islem === 'veritabani_baglantisi_olustur') {
@@ -77,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                 }
 
                 $env_dir = '/var/www/env';
+                if (!file_exists($env_dir)) { @mkdir($env_dir, 0777, true); }
                 $env_dosya = $env_dir . '/' . $proje_adi . '.env.php';
                 
                 $env_icerik = "<?php\nreturn [\n";
@@ -112,19 +127,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                 exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg(DOC_ROOT . '/' . $proje_adi));
 
                 if ($db_olustu) {
-                    $bildirim = '<div class="alert alert-basari">🗄️ <strong>' . htmlspecialchars($db_adi) . '</strong> veritabanı oluşturuldu ve <code>' . htmlspecialchars($proje_adi) . '/baglanti.php</code> (Sıfır Şifre / %100 Güvenli) bağlandı!</div>';
+                    $_SESSION['bildirim'] = '<div class="alert alert-basari">🗄️ <strong>' . htmlspecialchars($db_adi) . '</strong> veritabanı oluşturuldu ve <code>' . htmlspecialchars($proje_adi) . '/baglanti.php</code> bağlandı!</div>';
                 } else {
-                    $bildirim = '<div class="alert alert-bilgi">⚠️ Bağlantı dosyası oluşturuldu ancak MySQL hatası: ' . htmlspecialchars($db_hata) . '</div>';
+                    $_SESSION['bildirim'] = '<div class="alert alert-bilgi">⚠️ Bağlantı dosyası oluşturuldu ancak MySQL hatası: ' . htmlspecialchars($db_hata) . '</div>';
                 }
             }
         } elseif ($islem === 'veritabani_test_et') {
             $test_proje = preg_replace('/[^a-zA-Z0-9_-]/', '', trim($_POST['test_proje'] ?? ''));
             $env_yol = '/var/www/env/' . $test_proje . '.env.php';
 
-            if (file_exists($env_yol)) {
+            if (!empty($test_proje) && file_exists($env_yol)) {
                 $config = require $env_yol;
                 try {
-                    $test_db = new PDO("mysql:host=" . $config['DB_HOST'] . ";dbname=" . $config['DB_NAME'] . ";charset=" . $config['DB_CHARSET'], $config['DB_USER'], $config['DB_PASS']);
+                    $test_db = new PDO("mysql:host=" . $config['DB_HOST'] . ";dbname=" . $config['DB_NAME'] . ";charset=" . ($config['DB_CHARSET'] ?? 'utf8mb4'), $config['DB_USER'], $config['DB_PASS']);
                     $test_db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                     
                     $sorgu = $test_db->query("SHOW TABLES");
@@ -132,15 +147,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
 
                     if (!empty($tablolar)) {
                         $tablo_listesi = implode(', ', array_map(function($t) { return '<code>' . htmlspecialchars($t) . '</code>'; }, $tablolar));
-                        $bildirim = '<div class="alert alert-basari">🟢 <strong>' . htmlspecialchars($test_proje) . '</strong> projesinin <code>' . htmlspecialchars($config['DB_NAME']) . '</code> veritabanı bağlantısı **BAŞARILI**!<br>📊 <strong>' . count($tablolar) . '</strong> adet tablo bulundu: ' . $tablo_listesi . '</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-basari">🟢 <strong>' . htmlspecialchars($test_proje) . '</strong> projesinin <code>' . htmlspecialchars($config['DB_NAME']) . '</code> veritabanı bağlantısı **BAŞARILI**!<br>📊 <strong>' . count($tablolar) . '</strong> adet tablo bulundu: ' . $tablo_listesi . '</div>';
                     } else {
-                        $bildirim = '<div class="alert alert-basari">🟢 <strong>' . htmlspecialchars($test_proje) . '</strong> projesinin <code>' . htmlspecialchars($config['DB_NAME']) . '</code> veritabanı bağlantısı **BAŞARILI**!<br>ℹ️ Veritabanında henüz hiç tablo bulunmuyor (Boş Veritabanı).</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-basari">🟢 <strong>' . htmlspecialchars($test_proje) . '</strong> projesinin <code>' . htmlspecialchars($config['DB_NAME']) . '</code> veritabanı bağlantısı **BAŞARILI**!<br>ℹ️ Veritabanında henüz hiç tablo bulunmuyor (Boş Veritabanı).</div>';
                     }
                 } catch (PDOException $e) {
-                    $bildirim = '<div class="alert alert-hata">❌ <strong>' . htmlspecialchars($test_proje) . '</strong> veritabanı bağlantısı BAŞARISIZ!<br>Hata Detayı: ' . htmlspecialchars($e->getMessage()) . '</div>';
+                    $_SESSION['bildirim'] = '<div class="alert alert-hata">❌ <strong>' . htmlspecialchars($test_proje) . '</strong> veritabanı bağlantısı BAŞARISIZ!<br>Hata Detayı: ' . htmlspecialchars($e->getMessage()) . '</div>';
                 }
             } else {
-                $bildirim = '<div class="alert alert-hata">❌ <strong>' . htmlspecialchars($test_proje) . '</strong> projesi için henüz bir <code>.env.php</code> yapılandırması oluşturulmamış!</div>';
+                $_SESSION['bildirim'] = '<div class="alert alert-hata">❌ <strong>' . htmlspecialchars($test_proje) . '</strong> projesi için henüz bir <code>.env.php</code> yapılandırması bulunamadı!</div>';
             }
         } elseif ($islem === 'ozel_eleman_olustur') {
             $hedef_klasor = $_POST['hedef_klasor_yolu'] ?? DOC_ROOT;
@@ -153,14 +168,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                     $tam_yol = rtrim($hedef_klasor, '/') . '/' . $isim;
                     if (!file_exists($tam_yol) && @mkdir($tam_yol, 0777, true)) {
                         exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg($tam_yol));
-                        $bildirim = '<div class="alert alert-basari">📁 <strong>' . htmlspecialchars($isim) . '</strong> klasörü oluşturuldu.</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-basari">📁 <strong>' . htmlspecialchars($isim) . '</strong> klasörü oluşturuldu.</div>';
                     }
                 } else {
                     $isim = (substr($isim, -strlen($uzanti)) !== $uzanti && $uzanti !== '.htaccess') ? $isim . $uzanti : $isim;
                     $tam_yol = rtrim($hedef_klasor, '/') . '/' . ($uzanti === '.htaccess' ? '.htaccess' : $isim);
                     if (!file_exists($tam_yol) && @file_put_contents($tam_yol, "<?php\n") !== false) {
                         exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg($tam_yol));
-                        $bildirim = '<div class="alert alert-basari">📄 <strong>' . htmlspecialchars(basename($tam_yol)) . '</strong> oluşturuldu.</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-basari">📄 <strong>' . htmlspecialchars(basename($tam_yol)) . '</strong> oluşturuldu.</div>';
                     }
                 }
             }
@@ -173,7 +188,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                 exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg($backup_dir));
             }
             if (!class_exists('ZipArchive')) {
-                $bildirim = '<div class="alert alert-hata">❌ Hata: PHP ZipArchive modülü sunucuda yüklü değil!</div>';
+                $_SESSION['bildirim'] = '<div class="alert alert-hata">❌ Hata: PHP ZipArchive modülü sunucuda yüklü değil!</div>';
             } elseif ($gercek_hedef && is_dir($gercek_hedef)) {
                 $zip_tam_yol = $backup_dir . '/' . $proje_adi . '_' . date("Y-m-d_H-i") . '.zip';
                 $zip = new ZipArchive();
@@ -193,15 +208,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                     clearstatcache();
                     if (file_exists($zip_tam_yol) && filesize($zip_tam_yol) > 0) {
                         exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg($zip_tam_yol));
-                        $bildirim = '<div class="alert alert-basari">📦 <strong>' . htmlspecialchars($proje_adi) . '</strong> projesinin yedeği (' . $eklenen_sayi . ' dosya) başarıyla alındı.</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-basari">📦 <strong>' . htmlspecialchars($proje_adi) . '</strong> yedeği (' . $eklenen_sayi . ' dosya) alındı.</div>';
                     } else {
-                        $bildirim = '<div class="alert alert-hata">❌ Hata: ZIP dosyası oluşturuldu ancak 0 bayt görünüyor!</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-hata">❌ Hata: ZIP dosyası oluşturulamadı!</div>';
                     }
                 } else {
-                    $bildirim = '<div class="alert alert-hata">❌ ZIP Açma Hatası! Kodu: ' . $res . '</div>';
+                    $_SESSION['bildirim'] = '<div class="alert alert-hata">❌ ZIP Açma Hatası! Kodu: ' . $res . '</div>';
                 }
-            } else {
-                $bildirim = '<div class="alert alert-hata">❌ Geçersiz Proje Klasörü!</div>';
             }
         } elseif ($islem === 'yedek_geri_yukle') {
             $zip_yol = $_POST['yedek_dosyasi'] ?? '';
@@ -214,42 +227,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['islem_tipi'])) {
                 if (guvenliYolMu($hedef_proje_dizini)) {
                     $zip = new ZipArchive();
                     if ($zip->open($zip_yol) === TRUE) {
-                        if (!file_exists($hedef_proje_dizini)) {
-                            @mkdir($hedef_proje_dizini, 0777, true);
-                        }
+                        if (!file_exists($hedef_proje_dizini)) { @mkdir($hedef_proje_dizini, 0777, true); }
                         $zip->extractTo($hedef_proje_dizini);
                         $zip->close();
                         exec("sudo /usr/local/bin/fix-html-permissions.sh unlock " . escapeshellarg($hedef_proje_dizini));
-                        $bildirim = '<div class="alert alert-basari">🔄 <strong>' . htmlspecialchars($proje_adi) . '</strong> projesi başarıyla <code>' . htmlspecialchars($zip_adi) . '</code> yedeğine geri döndürüldü!</div>';
+                        $_SESSION['bildirim'] = '<div class="alert alert-basari">🔄 <strong>' . htmlspecialchars($proje_adi) . '</strong> yedeğe geri yüklendi!</div>';
                     }
                 }
             }
         } elseif ($islem === 'unlock' || $islem === 'lock') {
             exec("sudo /usr/local/bin/fix-html-permissions.sh " . escapeshellarg($islem) . " " . escapeshellarg(realpath($hedef)));
-            $bildirim = '<div class="alert alert-basari">🔐 İzinler güncellendi.</div>';
+            $_SESSION['bildirim'] = '<div class="alert alert-basari">🔐 İzinler güncellendi.</div>';
         } elseif ($islem === 'sil') {
             if (realpath($hedef) !== realpath(DOC_ROOT)) {
                 exec("rm -rf " . escapeshellarg(realpath($hedef)));
                 clearstatcache();
-                $bildirim = '<div class="alert alert-bilgi">🗑️ Silindi: <strong>' . htmlspecialchars(basename($hedef)) . '</strong></div>';
+                $_SESSION['bildirim'] = '<div class="alert alert-bilgi">🗑️ Silindi: <strong>' . htmlspecialchars(basename($hedef)) . '</strong></div>';
             }
         } elseif ($islem === 'dosya_kaydet') {
             @file_put_contents(realpath($hedef), $_POST['dosya_icerik'] ?? '');
-            $bildirim = '<div class="alert alert-basari">💾 Kaydedildi.</div>';
+            $_SESSION['bildirim'] = '<div class="alert alert-basari">💾 Dosya kaydedildi.</div>';
         }
     }
+    header('Location: index.php');
+    exit;
 }
 
-// GET Önbellek İstemleri
-if (isset($_GET['islem'])) {
-    if ($_GET['islem'] === 'opcache_temizle' && function_exists('opcache_reset')) {
-        opcache_reset(); $bildirim = '<div class="alert alert-basari">⚡ OPcache sıfırlandı!</div>';
-    } elseif ($_GET['islem'] === 'session_temizle') {
-        session_unset(); $bildirim = '<div class="alert alert-basari">🧹 Session temizlendi.</div>';
-    }
+// Bildirimi Al ve Tek Kullanımlık Yap
+$bildirim = '';
+if (!empty($_SESSION['bildirim'])) {
+    $bildirim = $_SESSION['bildirim'];
+    unset($_SESSION['bildirim']);
 }
 
-// Sayfa Çıktısı (View Rendering)
+// Görünüm (View) Render Etme
 require_once __DIR__ . '/includes/header.php';
 echo $bildirim;
 require_once __DIR__ . '/modules/dashboard.php';

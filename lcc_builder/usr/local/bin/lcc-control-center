@@ -1,0 +1,36 @@
+#!/bin/bash
+# Localhost Control Center - Desktop GUI Manager
+# Lead Developer: Mustafa Satılmış (@mustafao9)
+
+SECMET=$(zenity --list --radiolist \
+  --title="Localhost Control Center v1.0.2" \
+  --text="Lütfen yapmak istediğiniz işlemi seçin:" \
+  --column="Seç" --column="İşlem" \
+  TRUE "🌐 Web Paneli Aç (http://localhost)" \
+  FALSE "▶️ Servisleri Başlat (Apache & MariaDB)" \
+  FALSE "⏹️ Servisleri Durdur (Apache & MariaDB)" \
+  FALSE "🔄 Servisleri Yeniden Başlat" \
+  FALSE "🔓 Klasör İzinlerini Onar (777)" \
+  FALSE "📂 WWW Dizinini Aç (/var/www/html)" \
+  --width=500 --height=320)
+
+case "$SECMET" in
+  *"Web Paneli"*)
+    xdg-open http://localhost
+    ;;
+  *"Servisleri Başlat"*)
+    pkexec systemctl start apache2 mariadb && zenity --info --text="Servisler başarıyla başlatıldı!" --width=300
+    ;;
+  *"Servisleri Durdur"*)
+    pkexec systemctl stop apache2 mariadb && zenity --info --text="Servisler durduruldu." --width=300
+    ;;
+  *"Servisleri Yeniden Başlat"*)
+    pkexec systemctl restart apache2 mariadb && zenity --info --text="Servisler yeniden başlatıldı!" --width=300
+    ;;
+  *"İzinlerini Onar"*)
+    pkexec /usr/local/bin/fix-html-permissions.sh unlock /var/www/html && zenity --info --text="Dizin izinleri 777 olarak güncellendi." --width=300
+    ;;
+  *"WWW Dizinini Aç"*)
+    xdg-open /var/www/html
+    ;;
+esac

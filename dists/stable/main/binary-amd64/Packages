@@ -1,0 +1,17 @@
+Package: localhost-control-center
+Version: 1.0.1
+Architecture: all
+Maintainer: Mustafa Satılmıs <github.com/mustafao9>
+Depends: apache2, php, php-cli, php-mysql, php-zip, php-json, php-curl, php-mbstring, php-xml, composer, mariadb-server, curl, git, wget, xdg-utils, zip, unzip, imagemagick
+Filename: pool/main/localhost-control-center_1.0.1_all.deb
+Size: 40198
+MD5sum: 6b39df7bc956e71d020cb5e7fd115fa2
+SHA1: 9f63e7c0b57b1ec8cad2171057dc5008a3735450
+SHA256: 77c4c8d9eb9df4c455eb56fc967d9825c2b6e2793cb0485bd30b91c85bae66c7
+Section: devel
+Priority: optional
+Description: Developer cPanel and Environment Manager for Localhost PHP Development
+ Localhost Control Center (LCC) is a modular control panel designed
+ by Mustafa Satilmis to streamline local PHP development with secure ENV
+ configuration, automated database creation, Composer terminal, and backup management.
+
